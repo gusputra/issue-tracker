@@ -2,16 +2,24 @@ const express = require("express");
 const sqlite3 = require("sqlite3").verbose();
 const bodyParser = require("body-parser");
 const session = require("express-session");
+const path = require("path");
 const ExcelJS = require("exceljs");
 
 const app = express();
-const path = require("path");
+
+// ✅ Pastikan database tersimpan di folder data (agar bisa dibuka di Zeabur)
+const dbPath = path.join(__dirname, "data", "database.db");
+const fs = require("fs");
+
+// buat folder data jika belum ada
+if (!fs.existsSync(path.join(__dirname, "data"))) {
+  fs.mkdirSync(path.join(__dirname, "data"));
+}
+
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) console.error("❌ Database connection error:", err);
   else console.log("✅ Database connected:", dbPath);
 });
-
-
 
 // 🧱 SETUP EJS + STATIC
 app.set("view engine", "ejs");
@@ -22,7 +30,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // 🧠 SESSION CONFIG
 app.use(
   session({
-    secret: "supersecretkey",
+    secret: process.env.SESSION_SECRET || "supersecretkey",
     resave: false,
     saveUninitialized: false,
   })
@@ -84,8 +92,13 @@ db.serialize(() => {
 
 // 🕒 Function untuk log aktivitas
 function addLog(user, action) {
-  const timestamp = new Date().toLocaleString("en-GB", { timeZone: "Asia/Makassar" });
-  db.run(`INSERT INTO logs (user, action, timestamp) VALUES (?, ?, ?)`, [user, action, timestamp]);
+  const timestamp = new Date().toLocaleString("en-GB", {
+    timeZone: "Asia/Makassar",
+  });
+  db.run(
+    `INSERT INTO logs (user, action, timestamp) VALUES (?, ?, ?)`,
+    [user, action, timestamp]
+  );
 }
 
 // 🔐 LOGIN PAGE
@@ -101,7 +114,8 @@ app.post("/login", (req, res) => {
     [username, password],
     (err, user) => {
       if (err) return res.send("Database error");
-      if (!user) return res.render("login", { error: "Invalid username or password" });
+      if (!user)
+        return res.render("login", { error: "Invalid username or password" });
 
       req.session.user = user;
       addLog(username, "User logged in");
@@ -146,7 +160,6 @@ app.get("/", authRequired, (req, res) => {
   });
 });
 
-
 // ➕ ADD ISSUE
 app.get("/add", authRequired, (req, res) => {
   res.render("add", { user: req.session.user });
@@ -154,7 +167,9 @@ app.get("/add", authRequired, (req, res) => {
 
 app.post("/add", authRequired, (req, res) => {
   const { title, description, type, status } = req.body;
-  const created_at = new Date().toLocaleString("en-GB", { timeZone: "Asia/Makassar" });
+  const created_at = new Date().toLocaleString("en-GB", {
+    timeZone: "Asia/Makassar",
+  });
   db.run(
     `INSERT INTO issues (title, description, type, status, created_at) VALUES (?, ?, ?, ?, ?)`,
     [title, description, type, status, created_at],
@@ -176,7 +191,9 @@ app.get("/edit/:id", authRequired, (req, res) => {
 
 app.post("/edit/:id", authRequired, (req, res) => {
   const { title, description, type, status } = req.body;
-  const updated_at = new Date().toLocaleString("en-GB", { timeZone: "Asia/Makassar" });
+  const updated_at = new Date().toLocaleString("en-GB", {
+    timeZone: "Asia/Makassar",
+  });
   db.run(
     `UPDATE issues SET title=?, description=?, type=?, status=?, created_at=? WHERE id=?`,
     [title, description, type, status, updated_at, req.params.id],
@@ -190,6 +207,9 @@ app.post("/edit/:id", authRequired, (req, res) => {
 
 // ❌ DELETE ISSUE
 app.get("/delete/:id", authRequired, (req, res) => {
+  if (req.session.user.role !== "admin") {
+    return res.status(403).send("Access Denied: Admins Only");
+  }
   db.run(`DELETE FROM issues WHERE id = ?`, [req.params.id], (err) => {
     if (err) console.error(err);
     addLog(req.session.user.username, `Deleted issue #${req.params.id}`);
@@ -207,27 +227,23 @@ app.get("/users", adminOnly, (req, res) => {
 
 // ➕ ADD USER
 app.get("/add_user", adminOnly, (req, res) => {
-  db.all(`SELECT id, username, role FROM users ORDER BY id ASC`, (err, users) => {
-    if (err) users = [];
-    res.render("add_user", { user: req.session.user, users, error: null });
-  });
+  res.render("add_user", { user: req.session.user, error: null });
 });
 
 app.post("/add_user", adminOnly, (req, res) => {
   const { username, password, role } = req.body;
-  db.run(`INSERT INTO users (username, password, role) VALUES (?, ?, ?)`,
+  db.run(
+    `INSERT INTO users (username, password, role) VALUES (?, ?, ?)`,
     [username, password, role],
     (err) => {
       if (err) {
-        // kembalikan daftar user supaya ejs tidak error
-        db.all(`SELECT id, username, role FROM users ORDER BY id ASC`, (err2, users) => {
-          if (err2) users = [];
-          return res.render("add_user", { user: req.session.user, users, error: "Username already exists" });
+        return res.render("add_user", {
+          user: req.session.user,
+          error: "Username already exists",
         });
-      } else {
-        addLog(req.session.user.username, `Added new user: ${username}`);
-        res.redirect("/users");
       }
+      addLog(req.session.user.username, `Added new user: ${username}`);
+      res.redirect("/users");
     }
   );
 });
@@ -258,8 +274,14 @@ app.get("/export", adminOnly, async (req, res) => {
     rows.forEach((r) => sheet.addRow(r));
     addLog(req.session.user.username, "Exported issues to Excel");
 
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", "attachment; filename=issues.xlsx");
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=issues.xlsx"
+    );
     await workbook.xlsx.write(res);
     res.end();
   });
@@ -267,6 +289,6 @@ app.get("/export", adminOnly, async (req, res) => {
 
 // 🚀 START SERVER
 const PORT = process.env.WEB_PORT || process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
