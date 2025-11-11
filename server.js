@@ -7,7 +7,6 @@ const ExcelJS = require("exceljs");
 
 const app = express();
 const path = require("path");
-const dbPath = path.join(__dirname, "database.db");
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) console.error("❌ Database connection error:", err);
   else console.log("✅ Database connected:", dbPath);
