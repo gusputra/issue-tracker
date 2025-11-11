@@ -6,7 +6,7 @@ const path = require("path");
 const ExcelJS = require("exceljs");
 
 const app = express();
-const db = new sqlite3.Database("/data/database.db");
+const db = new sqlite3.Database("./database.db");
 
 // 🧱 SETUP EJS + STATIC
 app.set("view engine", "ejs");
