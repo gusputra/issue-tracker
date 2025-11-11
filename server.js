@@ -2,7 +2,6 @@ const express = require("express");
 const sqlite3 = require("sqlite3").verbose();
 const bodyParser = require("body-parser");
 const session = require("express-session");
-const path = require("path");
 const ExcelJS = require("exceljs");
 
 const app = express();
