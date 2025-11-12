@@ -232,21 +232,28 @@ app.get("/add_user", adminOnly, (req, res) => {
 
 app.post("/add_user", adminOnly, (req, res) => {
   const { username, password, role } = req.body;
+
   db.run(
     `INSERT INTO users (username, password, role) VALUES (?, ?, ?)`,
     [username, password, role],
     (err) => {
       if (err) {
-        return res.render("add_user", {
-          user: req.session.user,
-          error: "Username already exists",
+        // Jika gagal insert, tetap ambil daftar user agar EJS tidak error
+        db.all(`SELECT id, username, role FROM users ORDER BY id ASC`, (err2, users = []) => {
+          return res.render("add_user", {
+            user: req.session.user,
+            users,
+            error: "Username already exists or invalid input.",
+          });
         });
+      } else {
+        addLog(req.session.user.username, `Added new user: ${username}`);
+        res.redirect("/users");
       }
-      addLog(req.session.user.username, `Added new user: ${username}`);
-      res.redirect("/users");
     }
   );
 });
+
 
 // 📜 VIEW LOGS
 app.get("/logs", adminOnly, (req, res) => {
