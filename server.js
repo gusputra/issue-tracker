@@ -240,6 +240,16 @@ app.get("/add_user", adminOnly, (req, res) => {
 });
 
 // ➕ ADD USER (POST)
+app.get("/add_user", adminOnly, (req, res) => {
+  db.all(`SELECT id, username, role FROM users ORDER BY id ASC`, (err, users = []) => {
+    res.render("add_user", {
+      user: req.session.user,
+      users,
+      error: null
+    });
+  });
+});
+
 app.post("/add_user", adminOnly, (req, res) => {
   const { username, password, role } = req.body;
 
@@ -248,9 +258,7 @@ app.post("/add_user", adminOnly, (req, res) => {
     [username, password, role],
     (err) => {
       if (err) {
-        // Jika insert gagal (misal username sudah ada)
         db.all(`SELECT id, username, role FROM users ORDER BY id ASC`, (err2, users = []) => {
-          if (err2) users = [];
           return res.render("add_user", {
             user: req.session.user,
             users,
@@ -264,7 +272,6 @@ app.post("/add_user", adminOnly, (req, res) => {
     }
   );
 });
-
 
 
 // 📜 VIEW LOGS

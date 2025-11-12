@@ -126,9 +126,6 @@
   </style>
 </head>
 <body>
-  <% const users = typeof users !== 'undefined' ? users : []; %>
-  <% const error = typeof error !== 'undefined' ? error : null; %>
-
   <header>
     <h1>Issue Tracker - Add User</h1>
     <div>
@@ -141,6 +138,7 @@
     <% if (error) { %>
       <p class="error"><%= error %></p>
     <% } %>
+
     <form action="/add_user" method="POST">
       <input type="text" name="username" placeholder="Username" required>
       <input type="password" name="password" placeholder="Password" required>
