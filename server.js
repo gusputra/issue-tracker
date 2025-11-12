@@ -226,10 +226,20 @@ app.get("/users", adminOnly, (req, res) => {
 });
 
 // ➕ ADD USER
+// ➕ ADD USER (GET)
 app.get("/add_user", adminOnly, (req, res) => {
-  res.render("add_user", { user: req.session.user, error: null });
+  // Ambil semua user untuk ditampilkan di tabel
+  db.all(`SELECT id, username, role FROM users ORDER BY id ASC`, (err, users = []) => {
+    if (err) users = [];
+    res.render("add_user", {
+      user: req.session.user,
+      users,
+      error: null,
+    });
+  });
 });
 
+// ➕ ADD USER (POST)
 app.post("/add_user", adminOnly, (req, res) => {
   const { username, password, role } = req.body;
 
@@ -238,12 +248,13 @@ app.post("/add_user", adminOnly, (req, res) => {
     [username, password, role],
     (err) => {
       if (err) {
-        // Jika gagal insert, tetap ambil daftar user agar EJS tidak error
+        // Jika insert gagal (misal username sudah ada)
         db.all(`SELECT id, username, role FROM users ORDER BY id ASC`, (err2, users = []) => {
+          if (err2) users = [];
           return res.render("add_user", {
             user: req.session.user,
             users,
-            error: "Username already exists or invalid input.",
+            error: "⚠️ Username already exists or invalid input.",
           });
         });
       } else {
@@ -253,6 +264,7 @@ app.post("/add_user", adminOnly, (req, res) => {
     }
   );
 });
+
 
 
 // 📜 VIEW LOGS
